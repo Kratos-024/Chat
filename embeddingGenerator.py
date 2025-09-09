@@ -6,7 +6,7 @@ class EmbeddingGenerator:
     def __init__(self):
         pass
 
-    def generateEmbedsForDocument(self, transcripts):
+    def generateEmbedsForDocument(self, transcripts,id):
         try:
             embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
@@ -24,7 +24,7 @@ class EmbeddingGenerator:
             ]
 
             vectorstore = FAISS.from_documents(documents, embeddings_model)
-            vectorstore.save_local("video_vectors")
+            vectorstore.save_local(f"video_vectors/{id}")
 
             return vectorstore
 

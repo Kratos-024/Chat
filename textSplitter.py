@@ -1,4 +1,4 @@
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+from youtube_transcript_api import NoTranscriptFound, YouTubeTranscriptApi, TranscriptsDisabled
 import requests
 import json
 import re
@@ -6,18 +6,53 @@ from bs4 import BeautifulSoup
 def sanitize_filename(title):
     return re.sub(r'[<>:"/\\|?*]', '', title)
 class GetYoutubeVideo:
-    def __init__(self,video_id):
-        self.id= video_id
-        self.url = f'https://www.youtube.com/watch?v={self.id}'
-        
+    def __init__(self,url):
+        self.id= url.split('v=')[1]
+        self.url = url
+
     def transcriptMaker(self):
-        ytt_api = YouTubeTranscriptApi()
-        transcripts = ytt_api.fetch(self.id)
-        title = self.getTitle()
-        videoLength=self.getLengthOfVideo()
-        print("videoLength",videoLength)
-        transcriptJson = self.saveTranscript(title,transcripts,videoLength)
-        return transcriptJson
+        try:
+            transcript_data = None
+            transcript_Instance = YouTubeTranscriptApi()
+            transcript_list = transcript_Instance.list(video_id=self.id)
+
+            english_codes = ['en', 'en-US', 'en-GB', 'en-IN', 'en-CA', 'en-AU']
+            
+            try:
+                transcript_find = transcript_list.find_manually_created_transcript(language_codes=english_codes)
+                transcript_data = transcript_find.fetch()
+            except NoTranscriptFound:
+                try:
+                    transcript_find = transcript_list.find_generated_transcript(language_codes=english_codes)
+                    transcript_data = transcript_find.fetch()
+                    print("Found generated English transcript")
+                except NoTranscriptFound:
+                    try:
+                        transcript_find = transcript_list.find_transcript(language_codes=english_codes)
+                        transcript_data = transcript_find.fetch()
+                        print("Found translated English transcript")
+                    except NoTranscriptFound:
+                        try:
+                            transcript_data = transcript_Instance.fetch(video_id=self.id, languages=['hi'])
+                            print("Found Hindi transcript")
+                        except Exception as e:
+                            print(f"No transcript found in English or Hindi: {e}")
+                            return None
+
+            if transcript_data:
+                title = self.getTitle()
+                videoLength = self.getLengthOfVideo()
+                transcriptJson = self.saveTranscript(title, transcript_data, videoLength)
+                return transcriptJson
+            else:
+                return None
+
+        except TranscriptsDisabled:
+            print(f"Transcripts are disabled for video {self.id}")
+            return None
+        except Exception as e:
+            print(f"Error in transcriptMaker: {e}")
+            return None
     def getTitle(self):
         try:
             response = requests.get(self.url)
